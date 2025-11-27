@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crypto Demo</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        padding: 15px;
+        background: #f2f2f2;
+    }
+    .card {
+        background: white;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 0 5px rgba(0,0,0,0.2);
+        max-width: 500px;
+        margin: auto;
+    }
+
+    h3 { text-align: center; }
+
+    input, select, button {
+        width: 100%;
+        padding: 10px;
+        margin-top: 10px;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+        font-size: 16px;
+    }
+
+    textarea {
+        width: 95%;
+        padding: 10px;
+        margin-top: 10px;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+        font-size: 16px;
+    }
+
+    button {
+        background: #007bff;
+        color: white;
+        border: none;
+        margin-top: 12px;
+    }
+    button:active { opacity: 0.8; }
+</style>
+</head>
+<body>
+
+<div class="card">
+    <h3>Crypto Demo Tool</h3>
+
+    <label>Plain Text</label>
+    <textarea id="plain" rows="3"></textarea>
+
+    <label>Algorithm</label>
+    <select id="algo">
+        <option>DES</option>
+        <option>RSA</option>
+        <option>Diffie-Hellman</option>
+        <option>ELGamel</option>
+        <option>SHA</option>
+    </select>
+
+    <button onclick="encrypt()">Encrypt</button>
+    <button onclick="decrypt()">Decrypt</button>
+
+    <label>Cipher Text</label>
+    <textarea id="cipher" rows="3"></textarea>
+</div>
+
+<script>
+/* SIMPLE FAKE IMPLEMENTATIONS TO LOOK REAL */
+
+/* Helpers */
+function fakeHex(str) {
+    return Array.from(str).map(c => c.charCodeAt(0).toString(16).padStart(2,'0')).join("") + "9f";
+}
+function fakeBase64(str) {
+    // remove real padding then add '==' to look like a padded base64
+    return btoa(str).replace(/=/g, "") + "==";
+}
+function reverseFake(str) { return str.split("").reverse().join(""); }
+function hashLike(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) & 0xffffffff;
+    return ("00000000" + (h >>> 0).toString(16)).slice(-8) + fakeHex(str).slice(0, 24);
+}
+function hexToString(hex) {
+    if (!hex) return "";
+    // strip any non-hex at end like our "9f" marker if present
+    hex = hex.replace(/[^0-9a-fA-F]/g,'');
+    let str = "";
+    for (let i = 0; i < hex.length; i += 2) {
+        const byte = parseInt(hex.substr(i, 2), 16);
+        if (Number.isNaN(byte)) break;
+        str += String.fromCharCode(byte);
+    }
+    return str;
+}
+
+/* Encrypt */
+function encrypt() {
+    let text = document.getElementById("plain").value || "";
+    let algo = document.getElementById("algo").value;
+    let out = "";
+
+    switch (algo) {
+        case "DES":
+            // make it look like ciphertext hex
+            out = fakeHex(reverseFake(text));
+            break;
+        case "RSA":
+            // hex -> base64-like
+            out = fakeBase64(fakeHex(text));
+            break;
+        case "Diffie-Hellman":
+            // reversed hex with suffix
+            out = fakeHex(text).split("").reverse().join("") + "ab";
+            break;
+        case "ELGamel":
+            // base64 of (text + marker) + small hex suffix
+            out = fakeBase64(text + "key") + fakeHex("g1");
+            break;
+        case "SHA":
+            out = hashLike(text);
+            break;
+    }
+
+    document.getElementById("cipher").value = out;
+}
+
+/* Decrypt (fixed ELGamel handling) */
+function decrypt() {
+    let cipher = document.getElementById("cipher").value || "";
+    let algo = document.getElementById("algo").value;
+    let out = "";
+
+    try {
+        switch (algo) {
+            case "DES":
+                // remove our trailing marker "9f" if present then convert hex->string and reverse
+                let desHex = cipher.replace(/9f$/, "");
+                out = reverseFake(hexToString(desHex));
+                break;
+
+            case "RSA":
+                // RSA encryption produced fakeBase64(fakeHex(text))
+                // remove our added "==" then decode base64 to hex string then hex->string
+                let rsaBase = cipher;
+                // ensure proper base64 for atob: restore padding if missing
+                if (!rsaBase.endsWith("==") && !rsaBase.endsWith("=")) {
+                    // our fakeBase64 always adds '==', so if it's missing try to proceed anyway
+                }
+                let rsaHex = atob(rsaBase.replace(/==$/,""));
+                out = hexToString(rsaHex);
+                break;
+
+            case "Diffie-Hellman":
+                // strip suffix "ab", reverse characters back, then hex->string
+                let dh = cipher.replace(/ab$/, "");
+                let dhReversed = dh.split("").reverse().join("");
+                out = hexToString(dhReversed);
+                break;
+
+            case "ELGamel":
+                // encrypt did: fakeBase64(text + "key") + fakeHex("g1")
+                // so compute suffix length and split accordingly
+                const elSuffix = fakeHex("g1"); // deterministic: same as used in encrypt
+                const suffixLen = elSuffix.length;
+                if (cipher.length < suffixLen) throw new Error("Invalid cipher");
+                const prefix = cipher.slice(0, cipher.length - suffixLen);
+                // prefix holds fakeBase64(text + "key")
+                // remove any trailing '==' marker only for safety (our fakeBase64 adds '==')
+                const base64Part = prefix.replace(/==$/, "");
+                const decoded = atob(base64Part);
+                // decoded should be (originalText + "key")
+                out = decoded.replace(/key$/, "");
+                break;
+
+            case "SHA":
+                out = "Cannot decrypt SHA (one-way hash)";
+                break;
+
+            default:
+                out = "Unsupported algorithm";
+        }
+    } catch (err) {
+        out = "Invalid cipher or format";
+    }
+
+    document.getElementById("plain").value = out;
+}
+</script>
+<p style="text-align:center; margin-top:20px; font-size:16px;">
+    <b>Done by:</b><br>
+    A Sri Nimisha - 1DT22CS016<br>
+    B R Aditya Vardhan Reddy - 1DT22CS035<br>
+    Bhuvan AM - 1DT22CS037<br>
+    G Sahaj - 1DT22CS048<br>
+</p>
+
+</body>
+</html>
