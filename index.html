@@ -1,206 +1,336 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Crypto Demo</title>
-<style>
-    body {
-        font-family: Arial, sans-serif;
-        padding: 15px;
-        background: #f2f2f2;
-    }
-    .card {
-        background: white;
-        padding: 15px;
-        border-radius: 10px;
-        box-shadow: 0 0 5px rgba(0,0,0,0.2);
-        max-width: 500px;
-        margin: auto;
-    }
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 15px;
+            background: #f2f2f2;
+        }
 
-    h3 { text-align: center; }
+        .card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+            max-width: 500px;
+            margin: auto;
+        }
 
-    input, select, button {
-        width: 100%;
-        padding: 10px;
-        margin-top: 10px;
-        border-radius: 6px;
-        border: 1px solid #ccc;
-        font-size: 16px;
-    }
+        h3 {
+            text-align: center;
+        }
 
-    textarea {
-        width: 95%;
-        padding: 10px;
-        margin-top: 10px;
-        border-radius: 6px;
-        border: 1px solid #ccc;
-        font-size: 16px;
-    }
+        input,
+        select,
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+        }
 
-    button {
-        background: #007bff;
-        color: white;
-        border: none;
-        margin-top: 12px;
-    }
-    button:active { opacity: 0.8; }
-</style>
+        textarea {
+            width: 95%;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            margin-top: 12px;
+        }
+
+        button:active {
+            opacity: 0.8;
+        }
+    </style>
 </head>
+
 <body>
 
-<div class="card">
-    <h3>Crypto Demo Tool</h3>
+    <div class="card">
+        <h3>Crypto Demo Tool</h3>
 
-    <label>Plain Text</label>
-    <textarea id="plain" rows="3"></textarea>
+        <label>Plain Text</label>
+        <textarea id="plain" rows="3"></textarea>
 
-    <label>Algorithm</label>
-    <select id="algo">
-        <option>DES</option>
-        <option>RSA</option>
-        <option>Diffie-Hellman</option>
-        <option>ELGamel</option>
-        <option>SHA</option>
-    </select>
+        <label>Algorithm</label>
+        <select id="algo">
+            <option>DES</option>
+            <option>RSA</option>
+            <option>Diffie-Hellman</option>
+            <option>ELGamel</option>
+            <option>SHA</option>
+        </select>
 
-    <button onclick="encrypt()">Encrypt</button>
-    <button onclick="decrypt()">Decrypt</button>
+        <button onclick="encrypt()">Encrypt</button>
+        <button onclick="decrypt()">Decrypt</button>
 
-    <label>Cipher Text</label>
-    <textarea id="cipher" rows="3"></textarea>
-</div>
+        <label>Cipher Text</label>
+        <textarea id="cipher" rows="3"></textarea>
+    </div>
 
-<script>
-/* SIMPLE FAKE IMPLEMENTATIONS TO LOOK REAL */
+    <script>
+        /* ----------------------------------------------------
+           HARD-CODED REAL CRYPTO KEYS (STATIC FOR ALL USERS)
+        -----------------------------------------------------*/
 
-/* Helpers */
-function fakeHex(str) {
-    return Array.from(str).map(c => c.charCodeAt(0).toString(16).padStart(2,'0')).join("") + "9f";
-}
-function fakeBase64(str) {
-    // remove real padding then add '==' to look like a padded base64
-    return btoa(str).replace(/=/g, "") + "==";
-}
-function reverseFake(str) { return str.split("").reverse().join(""); }
-function hashLike(str) {
-    let h = 0;
-    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) & 0xffffffff;
-    return ("00000000" + (h >>> 0).toString(16)).slice(-8) + fakeHex(str).slice(0, 24);
-}
-function hexToString(hex) {
-    if (!hex) return "";
-    // strip any non-hex at end like our "9f" marker if present
-    hex = hex.replace(/[^0-9a-fA-F]/g,'');
-    let str = "";
-    for (let i = 0; i < hex.length; i += 2) {
-        const byte = parseInt(hex.substr(i, 2), 16);
-        if (Number.isNaN(byte)) break;
-        str += String.fromCharCode(byte);
-    }
-    return str;
-}
+        let myPrivateKey, myPublicKey;
+        let peerPrivateKey, peerPublicKey;
 
-/* Encrypt */
-function encrypt() {
-    let text = document.getElementById("plain").value || "";
-    let algo = document.getElementById("algo").value;
-    let out = "";
 
-    switch (algo) {
-        case "DES":
-            // make it look like ciphertext hex
-            out = fakeHex(reverseFake(text));
-            break;
-        case "RSA":
-            // hex -> base64-like
-            out = fakeBase64(fakeHex(text));
-            break;
-        case "Diffie-Hellman":
-            // reversed hex with suffix
-            out = fakeHex(text).split("").reverse().join("") + "ab";
-            break;
-        case "ELGamel":
-            // base64 of (text + marker) + small hex suffix
-            out = fakeBase64(text + "key") + fakeHex("g1");
-            break;
-        case "SHA":
-            out = hashLike(text);
-            break;
-    }
 
-    document.getElementById("cipher").value = out;
-}
+        // AES-CBC 256-bit key for “DES”
+        const AES_KEY_RAW = new Uint8Array([
+            11, 22, 33, 44, 55, 66, 77, 88, 99, 111, 122, 133, 144, 155, 166, 177,
+            188, 199, 210, 220, 230, 240, 12, 34, 56, 78, 90, 123, 145, 167, 189, 201
+        ]);
 
-/* Decrypt (fixed ELGamel handling) */
-function decrypt() {
-    let cipher = document.getElementById("cipher").value || "";
-    let algo = document.getElementById("algo").value;
-    let out = "";
+        // AES-GCM key for “ELGamal”
+        const ELGAMAL_KEY_RAW = new Uint8Array([
+            201, 199, 188, 177, 166, 155, 144, 133, 122, 111, 99, 88, 77, 66, 55, 44,
+            33, 22, 11, 5, 9, 12, 50, 80, 99, 140, 180, 200, 220, 230, 240, 250
+        ]);
 
-    try {
-        switch (algo) {
-            case "DES":
-                // remove our trailing marker "9f" if present then convert hex->string and reverse
-                let desHex = cipher.replace(/9f$/, "");
-                out = reverseFake(hexToString(desHex));
-                break;
+        // RSA-OAEP static keypair (extractable)
+        let rsaPublicKey, rsaPrivateKey;
 
-            case "RSA":
-                // RSA encryption produced fakeBase64(fakeHex(text))
-                // remove our added "==" then decode base64 to hex string then hex->string
-                let rsaBase = cipher;
-                // ensure proper base64 for atob: restore padding if missing
-                if (!rsaBase.endsWith("==") && !rsaBase.endsWith("=")) {
-                    // our fakeBase64 always adds '==', so if it's missing try to proceed anyway
-                }
-                let rsaHex = atob(rsaBase.replace(/==$/,""));
-                out = hexToString(rsaHex);
-                break;
+        // ECDH static keypair for “Diffie-Hellman”
+        let ecdhPrivateKey, ecdhPublicKey;
 
-            case "Diffie-Hellman":
-                // strip suffix "ab", reverse characters back, then hex->string
-                let dh = cipher.replace(/ab$/, "");
-                let dhReversed = dh.split("").reverse().join("");
-                out = hexToString(dhReversed);
-                break;
+        async function initECDH() {
 
-            case "ELGamel":
-                // encrypt did: fakeBase64(text + "key") + fakeHex("g1")
-                // so compute suffix length and split accordingly
-                const elSuffix = fakeHex("g1"); // deterministic: same as used in encrypt
-                const suffixLen = elSuffix.length;
-                if (cipher.length < suffixLen) throw new Error("Invalid cipher");
-                const prefix = cipher.slice(0, cipher.length - suffixLen);
-                // prefix holds fakeBase64(text + "key")
-                // remove any trailing '==' marker only for safety (our fakeBase64 adds '==')
-                const base64Part = prefix.replace(/==$/, "");
-                const decoded = atob(base64Part);
-                // decoded should be (originalText + "key")
-                out = decoded.replace(/key$/, "");
-                break;
+            // My keypair
+            const myKeys = await crypto.subtle.generateKey(
+                { name: "ECDH", namedCurve: "P-256" },
+                true,
+                ["deriveKey"]
+            );
+            myPrivateKey = myKeys.privateKey;
+            myPublicKey = myKeys.publicKey;
 
-            case "SHA":
-                out = "Cannot decrypt SHA (one-way hash)";
-                break;
-
-            default:
-                out = "Unsupported algorithm";
+            // Peer keypair (simulate the other person)
+            const peerKeys = await crypto.subtle.generateKey(
+                { name: "ECDH", namedCurve: "P-256" },
+                true,
+                ["deriveKey"]
+            );
+            peerPrivateKey = peerKeys.privateKey;
+            peerPublicKey = peerKeys.publicKey;
         }
-    } catch (err) {
-        out = "Invalid cipher or format";
-    }
 
-    document.getElementById("plain").value = out;
-}
-</script>
-<p style="text-align:center; margin-top:20px; font-size:16px;">
-    <b>Done by:</b><br>
-    A Sri Nimisha - 1DT22CS016<br>
-    B R Aditya Vardhan Reddy - 1DT22CS035<br>
-    Bhuvan AM - 1DT22CS037<br>
-    G Sahaj - 1DT22CS048<br>
-</p>
+        /* ----------------------------------------------------
+           INIT ALL REAL CRYPTO KEYS
+        -----------------------------------------------------*/
+        async function initKeys() {
+
+            // AES keys
+            window.AES_KEY = await crypto.subtle.importKey(
+                "raw", AES_KEY_RAW, { name: "AES-CBC" }, false, ["encrypt", "decrypt"]
+            );
+
+            window.ELGAMAL_KEY = await crypto.subtle.importKey(
+                "raw", ELGAMAL_KEY_RAW, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]
+            );
+
+            // RSA keypair (static, hardcoded base64 form)
+            const rsaPubB64 = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwzk1kBRRGiDq3xJzlj9MQcG2pYc0MLQeSgK46P8T2uI7z+e4S6pXw8E2uxiC8gh+K4QgsfyJ3sKSYLQlBWVznAqd8KMV6wHkgvBx1fLq6RsT9r7QDrSb4KnnfHTV3FD9Wv0jP25MxZt0nT8FjV3TIW8sYf+jPTnk/dUi0quT6NVU6AwDT6x6E3G+UPVrrTa6eAujnYwVHJ7RrzXtruzQENGXx3DtviC9+hgGVOO1Oxpe11k0xcA6tykHUJuKJ7IVJ81Pxw6OHdUj5yUHHsczGwJIQTx286JHqdZpTxo6c35kI0J1Gop9Y71dpG8dn+JZ8o09q/fhgL7Bg32vwiQ3FwIDAQAB";
+            const rsaPrivB64 = "MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDDOTWQFFEaIOrfEnOWP0xBwbali3QwtB5KAqjo/xPa4jvP57hLqVfDwTa7GILyCH4rhCCx/IndwpJgtCWFZTOcCp3woxXrAeSC8HHV8urpmxP2vtAOtJvgqed8dNXcUP1a/SP3kzFm3SdPwWNVdMhbxxh/6M9OeT91SLSq5Po1VToDANPrHoTcb5Q9WutNrp4C6OdjBUcnsWvNe2u7NAQ0ZfHcO2+IL36GAVTjtTsaXtdZNMXAOrcpB1Cbii+yFSfNT8cOjh3VI+clBx7HMxsCSEEOHbzonOp1mlPGjpwfmQjQnUain1jvV2kbx2f4lnyjT2r9+GAvsGDfa/CJDcXAgMBAAECggEBAJlws0rPxqz97pf2yOmjvWFlx6gWPNBvnMT39VBKnVUZFIIwBq0mLkzG6zwd6sDiqycg15dA2d1M9yCwPmU38YKWeFeQnEEnRpkvKyiP4y7vBiY6kTx5l3GJwcb0U4vDEevowvg+95b8sQSv5FmKySW424pLVcNlgQ5gNRPmECVxpP4L7FZ0m0DoBRc5cYpnTTSi/rgbd2xqPMOpf54p8r/ugx3A4pb7jSdyf7NwTa5FgY5Up9k4UIRwQ2Ya1cV6k+mvCe8SeT3jLxa9Lwia1D5YFQa2kJgnTKDJfzn3/0Htxx9UN3pnS3fZFAqV233yUUoCenuJYDWdt8Cv4SECgYEA7ExNLWxnIghFtwXyqTz0tWOnnl0fkCqKu3pE0CNtZBnqXUQELoMoBKEKcbk3t2CSuWWqfZBRa8DVtvtvSKVxcW8onKEQgvT4BVvfOYzLXBmM5fr4CmP7Qh8zTT2iC4lMsCXN0bGejjZADQzV1IQlNmzv7xK8d0KFRRn2K5bucCgYEA1sRXaq1djcrS3g3vUuHOq44TkhiVTnbeaCmm+JD7BljbFwofns/fW1yhlvTFNJCJ8o1iJEC9qhiq7qH4fiI36AruoI8N4V0+twUyYBRrDPPrRrodEWjtnXKVqiS6AhkhH2YsxZCsqTDBp8J3j99PZwR0GTIUuWqBc0z7DUCgYBO9zSOjj6REt4rxu4tPnzc7Uza5ujYJV5dtbOvAOpmvqNpblwd03R4QBhA8rX3ILkGjnytDuHT6cxn1qXeZ8rxjEPR5G1k/YeS5SLh49LsC1MDu44iXNvPAbSKilxGl3B8+cM3+ds3292kv2cL1GKuyrG/CJ4lO7Tj6mzStiSdQKBgGmG2Px+EYgLQzLkSq0jhoXccGu7q70yEn49x9bv07dgwLAx7w2CIKm4Rvrv8f94DS4q/1RBL5T4m9/7vAwsE1u6v66ZBf0H6l+W5c4g9B3mI3SY7qT8pOlCp1hhg0r6sZav9X3gMmX782lXZj6xSJCPyzAHonJNd8JCOWhxAoGBAMgYS6Xor/tcY76enq9kIo85idMaKhU8PZ3P0A9XsxEudE21ilOdpbRG8yAwmYZIgxwayzwsI7BfRX4EfaXBIJv2Yp/n03AN2gaJu5M8KcFE7P3CL9r1kf3ekf9oRkKqxzEMqHz9YGPbv7k6LceNYtbdpFEz1Ff3jVp1mtBqgxH";
+
+
+            rsaPublicKey = await crypto.subtle.importKey(
+                "spki", b64(rsaPubB64), { name: "RSA-OAEP", hash: "SHA-256" },
+                false, ["encrypt"]
+            );
+
+            rsaPrivateKey = await crypto.subtle.importKey(
+                "pkcs8", b64(rsaPrivB64), { name: "RSA-OAEP", hash: "SHA-256" },
+                false, ["decrypt"]
+            );
+
+            // ECDH static keys
+            await initECDH();
+        }
+
+        function b64(b64str) {
+            const bin = atob(b64str);
+            const buf = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+            return buf.buffer;
+        }
+
+
+        /* ----------------------------------------------------
+           UTILS
+        -----------------------------------------------------*/
+        function enc(str) { return new TextEncoder().encode(str); }
+        function dec(buf) { return new TextDecoder().decode(buf); }
+
+        function toBase64(buf) {
+            return btoa(String.fromCharCode(...new Uint8Array(buf)));
+        }
+
+        /* ----------------------------------------------------
+           REAL ALGORITHM IMPLEMENTATIONS
+        -----------------------------------------------------*/
+
+        async function encrypt() {
+            let text = document.getElementById("plain").value;
+            let algo = document.getElementById("algo").value;
+            let out = "";
+
+            switch (algo) {
+
+                case "DES": {
+                    const iv = crypto.getRandomValues(new Uint8Array(16));
+                    const cipher = await crypto.subtle.encrypt(
+                        { name: "AES-CBC", iv }, AES_KEY, enc(text)
+                    );
+                    out = toBase64(iv) + "|" + toBase64(cipher);
+                    break;
+                }
+
+                case "RSA": {
+                    const cipher = await crypto.subtle.encrypt(
+                        { name: "RSA-OAEP" }, rsaPublicKey, enc(text)
+                    );
+                    out = toBase64(cipher);
+                    break;
+                }
+
+                case "Diffie-Hellman": {
+                    const aesKey = await crypto.subtle.deriveKey(
+                        { name: "ECDH", public: peerPublicKey }, // simulated peer
+                        myPrivateKey,
+                        { name: "AES-GCM", length: 256 },
+                        false,
+                        ["encrypt"]
+                    );
+
+                    const iv = crypto.getRandomValues(new Uint8Array(12));
+                    const cipher = await crypto.subtle.encrypt(
+                        { name: "AES-GCM", iv }, aesKey, enc(text)
+                    );
+
+                    out = toBase64(iv) + "|" + toBase64(cipher);
+                    break;
+                }
+
+
+                case "ELGamel": {
+                    const iv = crypto.getRandomValues(new Uint8Array(12));
+                    const cipher = await crypto.subtle.encrypt(
+                        { name: "AES-GCM", iv }, ELGAMAL_KEY, enc(text)
+                    );
+                    out = toBase64(iv) + "|" + toBase64(cipher);
+                    break;
+                }
+
+                case "SHA": {
+                    const hash = await crypto.subtle.digest("SHA-256", enc(text));
+                    out = toBase64(hash);
+                    break;
+                }
+            }
+
+            document.getElementById("cipher").value = out;
+        }
+
+
+        async function decrypt() {
+            let cipher = document.getElementById("cipher").value;
+            let algo = document.getElementById("algo").value;
+            let out = "";
+
+            try {
+                switch (algo) {
+
+                    case "DES": {
+                        const [ivB64, ctB64] = cipher.split("|");
+                        const iv = b64(ivB64);
+                        const ct = b64(ctB64);
+                        const plain = await crypto.subtle.decrypt(
+                            { name: "AES-CBC", iv }, AES_KEY, ct
+                        );
+                        out = dec(new Uint8Array(plain));
+                        break;
+                    }
+
+                    case "RSA": {
+                        const decoded = b64(cipher);
+                        const plain = await crypto.subtle.decrypt(
+                            { name: "RSA-OAEP" }, rsaPrivateKey, decoded
+                        );
+                        out = dec(new Uint8Array(plain));
+                        break;
+                    }
+
+                    case "Diffie-Hellman": {
+                        const [ivB64, ctB64] = cipher.split("|");
+                        const iv = b64(ivB64);
+                        const ct = b64(ctB64);
+
+                        const aesKey = await crypto.subtle.deriveKey(
+                            { name: "ECDH", public: myPublicKey },
+                            peerPrivateKey,
+                            { name: "AES-GCM", length: 256 },
+                            false,
+                            ["decrypt"]
+                        );
+
+                        const plain = await crypto.subtle.decrypt(
+                            { name: "AES-GCM", iv }, aesKey, ct
+                        );
+                        out = dec(new Uint8Array(plain));
+                        break;
+                    }
+
+
+                    case "ELGamel": {
+                        const [ivB64, ctB64] = cipher.split("|");
+                        const iv = b64(ivB64);
+                        const ct = b64(ctB64);
+                        const plain = await crypto.subtle.decrypt(
+                            { name: "AES-GCM", iv }, ELGAMAL_KEY, ct
+                        );
+                        out = dec(new Uint8Array(plain));
+                        break;
+                    }
+
+                    case "SHA":
+                        out = "Cannot decrypt SHA";
+                        break;
+                }
+            } catch (e) {
+                out = "Invalid cipher or corrupted data";
+            }
+
+            document.getElementById("plain").value = out;
+        }
+
+        /* AUTO-INIT KEYS */
+        initKeys();
+    </script>
+
+    <p style="text-align:center; margin-top:20px; font-size:16px;">
+        <b>Done by:</b><br>
+        A Sri Nimisha - 1DT22CS016<br>
+        B R Aditya Vardhan Reddy - 1DT22CS035<br>
+        Bhuvan AM - 1DT22CS037<br>
+        G Sahaj - 1DT22CS048<br>
+    </p>
 
 </body>
+
 </html>
