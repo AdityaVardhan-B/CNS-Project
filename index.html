@@ -55,6 +55,7 @@
             opacity: 0.8;
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
 </head>
 
 <body>
@@ -83,108 +84,151 @@
 
     <script>
         /* ----------------------------------------------------
-           HARD-CODED REAL CRYPTO KEYS (STATIC FOR ALL USERS)
-        -----------------------------------------------------*/
-
-        let myPrivateKey, myPublicKey;
-        let peerPrivateKey, peerPublicKey;
-
-
-
-        // AES-CBC 256-bit key for “DES”
-        const AES_KEY_RAW = new Uint8Array([
-            11, 22, 33, 44, 55, 66, 77, 88, 99, 111, 122, 133, 144, 155, 166, 177,
-            188, 199, 210, 220, 230, 240, 12, 34, 56, 78, 90, 123, 145, 167, 189, 201
-        ]);
-
-        // AES-GCM key for “ELGamal”
-        const ELGAMAL_KEY_RAW = new Uint8Array([
-            201, 199, 188, 177, 166, 155, 144, 133, 122, 111, 99, 88, 77, 66, 55, 44,
-            33, 22, 11, 5, 9, 12, 50, 80, 99, 140, 180, 200, 220, 230, 240, 250
-        ]);
-
-        // RSA-OAEP static keypair (extractable)
-        let rsaPublicKey, rsaPrivateKey;
-
-        // ECDH static keypair for “Diffie-Hellman”
-        let ecdhPrivateKey, ecdhPublicKey;
-
-        async function initECDH() {
-
-            // My keypair
-            const myKeys = await crypto.subtle.generateKey(
-                { name: "ECDH", namedCurve: "P-256" },
-                true,
-                ["deriveKey"]
-            );
-            myPrivateKey = myKeys.privateKey;
-            myPublicKey = myKeys.publicKey;
-
-            // Peer keypair (simulate the other person)
-            const peerKeys = await crypto.subtle.generateKey(
-                { name: "ECDH", namedCurve: "P-256" },
-                true,
-                ["deriveKey"]
-            );
-            peerPrivateKey = peerKeys.privateKey;
-            peerPublicKey = peerKeys.publicKey;
-        }
-
-        /* ----------------------------------------------------
-           INIT ALL REAL CRYPTO KEYS
-        -----------------------------------------------------*/
-        async function initKeys() {
-
-            // AES keys
-            window.AES_KEY = await crypto.subtle.importKey(
-                "raw", AES_KEY_RAW, { name: "AES-CBC" }, false, ["encrypt", "decrypt"]
-            );
-
-            window.ELGAMAL_KEY = await crypto.subtle.importKey(
-                "raw", ELGAMAL_KEY_RAW, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]
-            );
-
-            // RSA keypair (static, hardcoded base64 form)
-            const rsaPubB64 = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwzk1kBRRGiDq3xJzlj9MQcG2pYc0MLQeSgK46P8T2uI7z+e4S6pXw8E2uxiC8gh+K4QgsfyJ3sKSYLQlBWVznAqd8KMV6wHkgvBx1fLq6RsT9r7QDrSb4KnnfHTV3FD9Wv0jP25MxZt0nT8FjV3TIW8sYf+jPTnk/dUi0quT6NVU6AwDT6x6E3G+UPVrrTa6eAujnYwVHJ7RrzXtruzQENGXx3DtviC9+hgGVOO1Oxpe11k0xcA6tykHUJuKJ7IVJ81Pxw6OHdUj5yUHHsczGwJIQTx286JHqdZpTxo6c35kI0J1Gop9Y71dpG8dn+JZ8o09q/fhgL7Bg32vwiQ3FwIDAQAB";
-            const rsaPrivB64 = "MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDDOTWQFFEaIOrfEnOWP0xBwbali3QwtB5KAqjo/xPa4jvP57hLqVfDwTa7GILyCH4rhCCx/IndwpJgtCWFZTOcCp3woxXrAeSC8HHV8urpmxP2vtAOtJvgqed8dNXcUP1a/SP3kzFm3SdPwWNVdMhbxxh/6M9OeT91SLSq5Po1VToDANPrHoTcb5Q9WutNrp4C6OdjBUcnsWvNe2u7NAQ0ZfHcO2+IL36GAVTjtTsaXtdZNMXAOrcpB1Cbii+yFSfNT8cOjh3VI+clBx7HMxsCSEEOHbzonOp1mlPGjpwfmQjQnUain1jvV2kbx2f4lnyjT2r9+GAvsGDfa/CJDcXAgMBAAECggEBAJlws0rPxqz97pf2yOmjvWFlx6gWPNBvnMT39VBKnVUZFIIwBq0mLkzG6zwd6sDiqycg15dA2d1M9yCwPmU38YKWeFeQnEEnRpkvKyiP4y7vBiY6kTx5l3GJwcb0U4vDEevowvg+95b8sQSv5FmKySW424pLVcNlgQ5gNRPmECVxpP4L7FZ0m0DoBRc5cYpnTTSi/rgbd2xqPMOpf54p8r/ugx3A4pb7jSdyf7NwTa5FgY5Up9k4UIRwQ2Ya1cV6k+mvCe8SeT3jLxa9Lwia1D5YFQa2kJgnTKDJfzn3/0Htxx9UN3pnS3fZFAqV233yUUoCenuJYDWdt8Cv4SECgYEA7ExNLWxnIghFtwXyqTz0tWOnnl0fkCqKu3pE0CNtZBnqXUQELoMoBKEKcbk3t2CSuWWqfZBRa8DVtvtvSKVxcW8onKEQgvT4BVvfOYzLXBmM5fr4CmP7Qh8zTT2iC4lMsCXN0bGejjZADQzV1IQlNmzv7xK8d0KFRRn2K5bucCgYEA1sRXaq1djcrS3g3vUuHOq44TkhiVTnbeaCmm+JD7BljbFwofns/fW1yhlvTFNJCJ8o1iJEC9qhiq7qH4fiI36AruoI8N4V0+twUyYBRrDPPrRrodEWjtnXKVqiS6AhkhH2YsxZCsqTDBp8J3j99PZwR0GTIUuWqBc0z7DUCgYBO9zSOjj6REt4rxu4tPnzc7Uza5ujYJV5dtbOvAOpmvqNpblwd03R4QBhA8rX3ILkGjnytDuHT6cxn1qXeZ8rxjEPR5G1k/YeS5SLh49LsC1MDu44iXNvPAbSKilxGl3B8+cM3+ds3292kv2cL1GKuyrG/CJ4lO7Tj6mzStiSdQKBgGmG2Px+EYgLQzLkSq0jhoXccGu7q70yEn49x9bv07dgwLAx7w2CIKm4Rvrv8f94DS4q/1RBL5T4m9/7vAwsE1u6v66ZBf0H6l+W5c4g9B3mI3SY7qT8pOlCp1hhg0r6sZav9X3gMmX782lXZj6xSJCPyzAHonJNd8JCOWhxAoGBAMgYS6Xor/tcY76enq9kIo85idMaKhU8PZ3P0A9XsxEudE21ilOdpbRG8yAwmYZIgxwayzwsI7BfRX4EfaXBIJv2Yp/n03AN2gaJu5M8KcFE7P3CL9r1kf3ekf9oRkKqxzEMqHz9YGPbv7k6LceNYtbdpFEz1Ff3jVp1mtBqgxH";
-
-
-            rsaPublicKey = await crypto.subtle.importKey(
-                "spki", b64(rsaPubB64), { name: "RSA-OAEP", hash: "SHA-256" },
-                false, ["encrypt"]
-            );
-
-            rsaPrivateKey = await crypto.subtle.importKey(
-                "pkcs8", b64(rsaPrivB64), { name: "RSA-OAEP", hash: "SHA-256" },
-                false, ["decrypt"]
-            );
-
-            // ECDH static keys
-            await initECDH();
-        }
-
-        function b64(b64str) {
-            const bin = atob(b64str);
-            const buf = new Uint8Array(bin.length);
-            for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-            return buf.buffer;
-        }
-
-
-        /* ----------------------------------------------------
            UTILS
         -----------------------------------------------------*/
         function enc(str) { return new TextEncoder().encode(str); }
         function dec(buf) { return new TextDecoder().decode(buf); }
 
-        function toBase64(buf) {
+        function toB64(buf) {
             return btoa(String.fromCharCode(...new Uint8Array(buf)));
+        }
+        function fromB64(b64) {
+            return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
         }
 
         /* ----------------------------------------------------
-           REAL ALGORITHM IMPLEMENTATIONS
+           CONSTANT AES KEYS (DES + ELGAMAL)
         -----------------------------------------------------*/
+        const AES_KEY_RAW = new Uint8Array([
+            11, 22, 33, 44, 55, 66, 77, 88, 99, 111, 122, 133, 144, 155, 166, 177,
+            188, 199, 210, 220, 230, 240, 12, 34, 56, 78, 90, 123, 145, 167, 189, 201
+        ]);
 
+        const ELGAMAL_KEY_RAW = new Uint8Array([
+            201, 199, 188, 177, 166, 155, 144, 133, 122, 111, 99, 88, 77, 66, 55, 44,
+            33, 22, 11, 5, 9, 12, 50, 80, 99, 140, 180, 200, 220, 230, 240, 250
+        ]);
+
+        let AES_KEY, ELGAMAL_KEY;
+        let rsaPublicKey, rsaPrivateKey;
+
+        /* ----------------------------------------------------
+   SIMPLE, SAFE SYNC "DH" USING BYTES
+-----------------------------------------------------*/
+        let dh_myPrivate = 7;
+        let dh_peerPrivate = 13;
+
+        let dh_myPublic;
+        let dh_peerPublic;
+
+        let dh_shared1; // BigInt
+        let dh_shared2; // BigInt
+
+        function modPow(base, exp, mod) {
+            let B = BigInt(base);
+            let E = BigInt(exp);
+            let M = BigInt(mod);
+            let res = 1n;
+            while (E > 0n) {
+                if (E & 1n) res = (res * B) % M;
+                B = (B * B) % M;
+                E >>= 1n;
+            }
+            return res;
+        }
+
+        function initDiffieHellman() {
+            const base = 5;
+            const prime = 997;
+            dh_myPublic = Number(modPow(base, dh_myPrivate, prime));
+            dh_peerPublic = Number(modPow(base, dh_peerPrivate, prime));
+
+            dh_shared1 = modPow(dh_peerPublic, dh_myPrivate, prime);
+            dh_shared2 = modPow(dh_myPublic, dh_peerPrivate, prime);
+            // both are BigInt and should be equal
+        }
+
+        /* base64 <-> Uint8Array helpers (safe for any length) */
+        function u8ToB64(u8) {
+            const CHUNK = 0x8000;
+            let str = "";
+            for (let i = 0; i < u8.length; i += CHUNK) {
+                str += String.fromCharCode(...u8.subarray(i, i + CHUNK));
+            }
+            return btoa(str);
+        }
+        function b64ToU8(b64) {
+            const bin = atob(b64.replace(/\s+/g, ""));
+            const u8 = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+            return u8;
+        }
+
+        /* XOR on raw bytes */
+        function xorBytes(u8, keyByte) {
+            const out = new Uint8Array(u8.length);
+            for (let i = 0; i < u8.length; i++) out[i] = u8[i] ^ keyByte;
+            return out;
+        }
+
+        /* encrypt/decrypt using proper byte handling */
+        function dhEncrypt(text) {
+            const encoder = new TextEncoder();
+            const pt = encoder.encode(text);               // Uint8Array bytes
+            const keyByte = Number(dh_shared1 % 256n);     // single byte key
+            const ct = xorBytes(pt, keyByte);
+            return u8ToB64(ct);
+        }
+
+        function dhDecrypt(cipherText) {
+            const decoder = new TextDecoder();
+            const ct = b64ToU8(cipherText);
+            const keyByte = Number(dh_shared2 % 256n);
+            const pt = xorBytes(ct, keyByte);
+            return decoder.decode(pt);
+        }
+
+
+        /* ----------------------------------------------------
+           INIT KEYS
+        -----------------------------------------------------*/
+        async function initKeys() {
+            AES_KEY = await crypto.subtle.importKey(
+                "raw", AES_KEY_RAW, { name: "AES-CBC" }, false, ["encrypt", "decrypt"]
+            );
+
+            ELGAMAL_KEY = await crypto.subtle.importKey(
+                "raw", ELGAMAL_KEY_RAW, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]
+            );
+
+            // RSA STATIC KEYS (unchanged)
+            const rsaPubB64 = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuG8jpHK6HQs5stjumRZzq7ScTJgPpK4wCCXoUQgyQ6r6N7aA/wI96KXf15FdtcdRAki6VpLLPDv3qJja+Qlad2x/Emhq49BTAceuXmBj3vusmEyjnSW1T1/dunnGaj68h8KRn+t4lACmUsXMDp1TO+4lfZLdJN8tsOe/pKf/WQsDEny3iTQTbKQzw95wf7keWnDu1JcYKVBjGpEivLj88+3DnUyPohStN53ZKw+WBd2QySgaaWkeNfZ6r4unX6bj9vQL9Yt6kMQ4zMWptlwgdBu8lWcRxzAXwrmM9gt5/3cGHK/bizYm2NYAPfZxD7LwmmmJzOTssotJ2nGOdmJPiQIDAQAB";
+            const rsaPrivB64 = "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC4byOkcrodCzmy2O6ZFnOrtJxMmA+krjAIJehRCDJDqvo3toD/Aj3opd/XkV21x1ECSLpWkss8O/eomNr5CVp3bH8SaGrj0FMBx65eYGPe+6yYTKOdJbVPX926ecZqPryHwpGf63iUAKZSxcwOnVM77iV9kt0k3y2w57+kp/9ZCwMSfLeJNBNspDPD3nB/uR5acO7UlxgpUGMakSK8uPzz7cOdTI+iFK03ndkrD5YF3ZDJKBppaR419nqvi6dfpuP29Av1i3qQxDjMxam2XCB0G7yVZxHHMBfCuYz2C3n/dwYcr9uLNibY1gA99nEPsvCaaYnM5Oyyi0nacY52Yk+JAgMBAAECggEABq1ypOmVqdq8l0HmoZqzS9KZaUyE6t/dOiF+0v0KlNidgDB8/lg4CMxSQAPLWMfp1VaJjvwRnHfijgAhLXl60dTjy07S6YMJZLvnqRMXipZu6ufoPjBQ62bIW5AJ8J7RqwV1ME0Ra72T4aG3szyO+ISCAJUb3J6xkM4gA8SK9Wl/T7zJNXDCqCoSgGgikY7vgVCDsoNGeb/cMgHOuquy3Om40zajo5/BCXrH3tLp48TeIVjCZo2ZqeYWIFYlux2PDRMb+hw9+wxtxv+IuAuUTaOWK7i6s6ZSFaLESki1abl5fOlStiC5JOjTzMF2PoTMUCcQD+mjr8vvblgwQifJYQKBgQDg8+9K1gKbxlC7wOvEKyitw2vDQ5IpnbWA+YAeEi5Bt6A2npxYWwjEFHQh3Wiyq7Q+jmcTHeVXW72iz2PwYYX3+lersZD5BRGMZrZ9cAe3XyaVvuwiN+k39E0tCt/PqFe0FdByTrV1wUgAf6c6nmtYDEMVafHkZEZwHN54DoCNXwKBgQDR45dVrGvNsFiIUNyaBa+R4RLI2EA1H7j4BgHrq6k03mtQN4oEdGzwmYQGXTucuAegntKTtjIaSI4dyRSW69IlA3SPLHpo7+eUYSuvr68WF2LfyrAZ5dLFUDr4JSaE9r7+0vSDBDPHydWPoGVUeyLd7vkIFvv3O9bM5KDgHzPkFwKBgQC4XFM+QvzqS/L4nVjccf6pwmI8KtHMV5tcc57jhkTwyRx+ByndY+ZgRN8Urg/TdtOG/VBOo47FNMPLfirK5DJWlI5rgWBuJhBGwBtJ3JoGV+4YhdujA62YlRj3FFVvK+mNBt/J/uXK9zgaaIRWj2UsSQhlsWl0pBXyZkaRoFkNAwKBgEinfdVcUBztdFgLlbGDUlkvDi+UG/XHu2Gvwq5vx6zTaVZlQ1Nzcdp/aaJCV8ZSNeG12LLlGMbcYsWQu53al+3UGl8NSHpWwVUtpc+1Auikw8cwBHGSirleomsPgRv5xfez0owfwkTgaxrCrRDnZxRoCrBwNFxKzHo0kjPC2VWVAoGAQpIPBS++JKW6ChHlgPi9N/03UuBybPTjUtD3lHuOBpv1xbvvi5/ZJEodz4+4ZZYW67dKtweWEGIBfEKq+v+b79HRJsFEnHW1uZLeQdPk4tPYp3HaC6TdQgGt7CFRgDSdVLJvdhAe0XxldB3pmaal0aC50eY8xiEyyAUZa5wOD+o=";
+
+            rsaPublicKey = await crypto.subtle.importKey(
+                "spki",
+                fromB64(rsaPubB64),          // <-- use Uint8Array directly, NOT .buffer
+                { name: "RSA-OAEP", hash: "SHA-256" },
+                false,
+                ["encrypt"]
+            );
+
+            rsaPrivateKey = await crypto.subtle.importKey(
+                "pkcs8",
+                fromB64(rsaPrivB64),         // <-- same here, no .buffer
+                { name: "RSA-OAEP", hash: "SHA-256" },
+                false,
+                ["decrypt"]
+            );
+
+
+
+            initDiffieHellman();
+        }
+
+        /* ----------------------------------------------------
+           ENCRYPT
+        -----------------------------------------------------*/
         async function encrypt() {
             let text = document.getElementById("plain").value;
             let algo = document.getElementById("algo").value;
@@ -195,51 +239,46 @@
                 case "DES": {
                     const iv = crypto.getRandomValues(new Uint8Array(16));
                     const cipher = await crypto.subtle.encrypt(
-                        { name: "AES-CBC", iv }, AES_KEY, enc(text)
+                        { name: "AES-CBC", iv },
+                        AES_KEY,
+                        enc(text)
                     );
-                    out = toBase64(iv) + "|" + toBase64(cipher);
+                    out = toB64(iv) + "|" + toB64(cipher);
                     break;
                 }
 
                 case "RSA": {
                     const cipher = await crypto.subtle.encrypt(
-                        { name: "RSA-OAEP" }, rsaPublicKey, enc(text)
+                        { name: "RSA-OAEP" },
+                        rsaPublicKey,
+                        enc(text)
                     );
-                    out = toBase64(cipher);
+                    console.log("PUB:", rsaPublicKey);
+                    console.log("PRIV:", rsaPrivateKey);
+
+                    out = toB64(cipher);
                     break;
                 }
 
                 case "Diffie-Hellman": {
-                    const aesKey = await crypto.subtle.deriveKey(
-                        { name: "ECDH", public: peerPublicKey }, // simulated peer
-                        myPrivateKey,
-                        { name: "AES-GCM", length: 256 },
-                        false,
-                        ["encrypt"]
-                    );
-
-                    const iv = crypto.getRandomValues(new Uint8Array(12));
-                    const cipher = await crypto.subtle.encrypt(
-                        { name: "AES-GCM", iv }, aesKey, enc(text)
-                    );
-
-                    out = toBase64(iv) + "|" + toBase64(cipher);
+                    out = dhEncrypt(text);
                     break;
                 }
-
 
                 case "ELGamel": {
                     const iv = crypto.getRandomValues(new Uint8Array(12));
                     const cipher = await crypto.subtle.encrypt(
-                        { name: "AES-GCM", iv }, ELGAMAL_KEY, enc(text)
+                        { name: "AES-GCM", iv },
+                        ELGAMAL_KEY,
+                        enc(text)
                     );
-                    out = toBase64(iv) + "|" + toBase64(cipher);
+                    out = toB64(iv) + "|" + toB64(cipher);
                     break;
                 }
 
                 case "SHA": {
                     const hash = await crypto.subtle.digest("SHA-256", enc(text));
-                    out = toBase64(hash);
+                    out = toB64(hash);
                     break;
                 }
             }
@@ -247,7 +286,9 @@
             document.getElementById("cipher").value = out;
         }
 
-
+        /* ----------------------------------------------------
+           DECRYPT
+        -----------------------------------------------------*/
         async function decrypt() {
             let cipher = document.getElementById("cipher").value;
             let algo = document.getElementById("algo").value;
@@ -258,53 +299,43 @@
 
                     case "DES": {
                         const [ivB64, ctB64] = cipher.split("|");
-                        const iv = b64(ivB64);
-                        const ct = b64(ctB64);
+                        const iv = fromB64(ivB64);
+                        const ct = fromB64(ctB64);
                         const plain = await crypto.subtle.decrypt(
-                            { name: "AES-CBC", iv }, AES_KEY, ct
+                            { name: "AES-CBC", iv },
+                            AES_KEY,
+                            ct
                         );
-                        out = dec(new Uint8Array(plain));
+                        out = dec(plain);
                         break;
                     }
 
                     case "RSA": {
-                        const decoded = b64(cipher);
+                        const ct = fromB64(cipher);
                         const plain = await crypto.subtle.decrypt(
-                            { name: "RSA-OAEP" }, rsaPrivateKey, decoded
+                            { name: "RSA-OAEP" },
+                            rsaPrivateKey,
+                            ct
                         );
-                        out = dec(new Uint8Array(plain));
+                        out = dec(plain);
                         break;
                     }
 
                     case "Diffie-Hellman": {
-                        const [ivB64, ctB64] = cipher.split("|");
-                        const iv = b64(ivB64);
-                        const ct = b64(ctB64);
-
-                        const aesKey = await crypto.subtle.deriveKey(
-                            { name: "ECDH", public: myPublicKey },
-                            peerPrivateKey,
-                            { name: "AES-GCM", length: 256 },
-                            false,
-                            ["decrypt"]
-                        );
-
-                        const plain = await crypto.subtle.decrypt(
-                            { name: "AES-GCM", iv }, aesKey, ct
-                        );
-                        out = dec(new Uint8Array(plain));
+                        out = dhDecrypt(cipher);
                         break;
                     }
 
-
                     case "ELGamel": {
                         const [ivB64, ctB64] = cipher.split("|");
-                        const iv = b64(ivB64);
-                        const ct = b64(ctB64);
+                        const iv = fromB64(ivB64);
+                        const ct = fromB64(ctB64);
                         const plain = await crypto.subtle.decrypt(
-                            { name: "AES-GCM", iv }, ELGAMAL_KEY, ct
+                            { name: "AES-GCM", iv },
+                            ELGAMAL_KEY,
+                            ct
                         );
-                        out = dec(new Uint8Array(plain));
+                        out = dec(plain);
                         break;
                     }
 
@@ -319,9 +350,10 @@
             document.getElementById("plain").value = out;
         }
 
-        /* AUTO-INIT KEYS */
+        /* START */
         initKeys();
     </script>
+
 
     <p style="text-align:center; margin-top:20px; font-size:16px;">
         <b>Done by:</b><br>
